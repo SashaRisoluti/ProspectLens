@@ -5,7 +5,7 @@ export
 
 DB_URL_LOCAL = postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_HOST_PORT)
 
-.PHONY: env up down seed test lint fmt migration coverage
+.PHONY: env up down seed test lint fmt migration coverage import-real
 
 env:
 	@test -f .env || (cp .env.example .env && echo "creato .env da .env.example")
@@ -36,3 +36,8 @@ migration: env  ## make migration MSG="descrizione"
 
 coverage: env  ## verifica la copertura di API-Football (consuma richieste del piano)
 	uv run --project backend python scripts/coverage_check.py $(ARGS)
+
+import-real: env  ## esegue ora il piano di import dei dati reali e il calcolo (consuma richieste)
+	docker compose up -d --wait db
+	cd backend && DATABASE_URL=$(DB_URL_LOCAL)/$(POSTGRES_DB)_real uv run alembic upgrade head
+	cd backend && DATABASE_URL=$(DB_URL_LOCAL)/$(POSTGRES_DB)_real uv run prospectlens import-plan $(ARGS)

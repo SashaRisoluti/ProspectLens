@@ -57,6 +57,15 @@ def test_compute_on_mock_data(db: Session, cfg: SportConfig) -> None:
     steady = _goal(db, "case-steady", "longevity")[-1]
     assert steady.components["seasons_above_threshold"] >= 2
 
+    # portieri: gol subiti in campo e titolarità calcolati dai dati di partita
+    gk = db.scalars(
+        select(m.PlayerSeasonStats)
+        .join(m.Player)
+        .where(m.Player.primary_position == "GK", m.PlayerSeasonStats.minutes > 450)
+    )
+    gk_metrics = [set(s.per90 or {}) for s in gk]
+    assert any({"goals_conceded_on_pitch", "minutes_share"} <= ms for ms in gk_metrics)
+
     # il calcolo è ripetibile: stessi conteggi, nessun duplicato
     compute(db, sport_id, cfg)
     assert db.scalar(select(func.count()).select_from(m.PlayerGoalScore)) == result["goal_scores"]

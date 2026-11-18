@@ -63,6 +63,9 @@ class Metric(_Strict):
     requires: str
     shrinkage_k: float | None = None
     weight: float = 1.0  # peso nel Livello (media pesata degli z-score delle metriche)
+    # performance: misura una prestazione; usage: uso da parte dell'allenatore (minuti);
+    # discipline: cartellini. Un Livello senza metriche di performance ha affidabilità bassa.
+    signal: Literal["performance", "usage", "discipline"] = "performance"
     description_it: str
     how_to_read_it: str
     formula_it: str

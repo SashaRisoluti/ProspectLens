@@ -41,6 +41,13 @@ docker compose exec api prospectlens import-csv /app/data/export.csv \
     --competition "Serie D" --level 4 --group A --season 2024-25
 ```
 
+**Dati reali in automatico.** I dati reali stanno in un database separato
+(`<POSTGRES_DB>_real`), così non si mescolano con quelli mock. Il container `worker` esegue
+ogni giorno (e all'avvio) il piano `API_IMPORT_PLAN` del `.env` con al massimo
+`API_DAILY_BUDGET` richieste, poi ricalcola. `make import-real` lo esegue subito.
+Con il piano Free il piano predefinito (Serie C e Serie B, 3 stagioni) richiede circa
+8 giorni.
+
 Se il budget di richieste finisce a metà, il comando si ferma senza importare la
 competizione incompleta: rilancialo il giorno dopo e riparte dalla cache.
 

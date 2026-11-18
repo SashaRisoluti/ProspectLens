@@ -41,10 +41,15 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: ["prospectlens", "worker"]
+    # Il worker aggiorna i DATI REALI (database <POSTGRES_DB>_real): import giornaliero dal
+    # fornitore secondo API_IMPORT_PLAN, poi calcolo. I dati mock restano nel database principale.
+    command: ["sh", "-c", "alembic upgrade head && prospectlens worker"]
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}_real
       PIPELINE_HOUR: ${PIPELINE_HOUR:-5}
+      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY:-}
+      API_IMPORT_PLAN: ${API_IMPORT_PLAN:-}
+      API_DAILY_BUDGET: ${API_DAILY_BUDGET:-95}
     volumes:
       - ./data:/app/data
     depends_on:

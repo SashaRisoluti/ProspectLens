@@ -45,6 +45,17 @@ WHERE c.sport_id = :sport_id
 """
 
 
+CONCEDED_SQL = """
+SELECT a.player_id, a.team_id, m.competition_id, m.season_id, count(e.id) AS conceded
+FROM appearance a
+JOIN match m ON m.id = a.match_id
+LEFT JOIN match_event e
+       ON e.match_id = a.match_id AND e.type IN ('goal', 'own_goal')
+      AND e.team_id <> a.team_id AND e.minute > a.minute_in AND e.minute <= a.minute_out
+GROUP BY 1, 2, 3, 4
+"""
+
+
 def _read(session: Session, sql: str, **params: Any) -> pd.DataFrame:
     return pd.read_sql(text(sql), session.connection(), params=params)
 
@@ -71,7 +82,16 @@ def load_stats(session: Session, sport_id: int, cfg: SportConfig) -> pd.DataFram
     df = df.merge(team_games, on=["team_id", "competition_id", "season_id"], how="left")
     df["team_matches"] = df["n"]
     df["team_minutes"] = df["n"] * cfg.normalization.per
-    return df.drop(columns="n")
+    # gol subiti dalla squadra mentre il giocatore era in campo (da formazioni ed eventi)
+    conceded = _read(session, CONCEDED_SQL)
+    df = df.drop(columns="n").merge(
+        conceded, on=["player_id", "team_id", "competition_id", "season_id"], how="left"
+    )
+    df["raw"] = [
+        r | {"goals_conceded_on_pitch": float(c)} if pd.notna(c) else r
+        for r, c in zip(df["raw"], df["conceded"], strict=True)
+    ]
+    return df.drop(columns="conceded")
 
 
 def aggregate_player_seasons(rows: pd.DataFrame, cfg: SportConfig) -> pd.DataFrame:
@@ -102,6 +122,8 @@ def aggregate_player_seasons(rows: pd.DataFrame, cfg: SportConfig) -> pd.DataFra
             "z_within",
             "data_types",
             "level_n",
+            "level_perf_n",
+            "level_metrics",
             "relative_age",
             "minutes_share",
             "share_vs_peers",
@@ -322,6 +344,8 @@ def _score_impact(
 def _reliability(r: Any, cfg: SportConfig) -> str:
     if not np.isfinite(r.level) or r.minutes < cfg.thresholds.min_minutes_sample:
         return "low"
+    if r.level_perf_n == 0:  # solo minuti e cartellini: indicatori indiretti
+        return "low"
     if r.valid and "player_stats_advanced" in r.data_types:
         return "high"
     return "medium"
@@ -369,6 +393,8 @@ def _persist(
         (r.player_id, r.season_id): {
             "data_types": sorted(r.data_types),
             "metrics_in_level": int(r.level_n),
+            "level_metrics": list(r.level_metrics),
+            "level_has_performance_metrics": bool(r.level_perf_n),
             "source": r.source,
             "fetched_at": r.fetched_at.isoformat(),
             "competition_id": int(r.competition_id),

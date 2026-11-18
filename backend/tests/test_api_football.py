@@ -85,7 +85,12 @@ RESPONSES: dict[tuple[str, tuple[tuple[str, Any], ...]], dict[str, Any]] = {
             }
         ],
     },
-    ("players", (("league", LEAGUE), ("page", 1), ("season", 2024))): {
+    ("players", (("page", 1), ("season", 2024), ("team", str(AWAY)))): {
+        "errors": [],
+        "paging": {"current": 1, "total": 1},
+        "response": [],
+    },
+    ("players", (("page", 1), ("season", 2024), ("team", str(HOME)))): {
         "errors": [],
         "paging": {"current": 1, "total": 1},
         "response": [
@@ -102,7 +107,7 @@ RESPONSES: dict[tuple[str, tuple[tuple[str, Any], ...]], dict[str, Any]] = {
                     {
                         "team": {"id": HOME},
                         # il fornitore etichetta a volte con un'altra competizione
-                        "league": {"id": 997},
+                        "league": {"id": 997, "name": "Serie D - Promotion - Play-offs"},
                         "games": {
                             "minutes": 1500,
                             "appearences": 20,
@@ -114,9 +119,9 @@ RESPONSES: dict[tuple[str, tuple[tuple[str, Any], ...]], dict[str, Any]] = {
                         "shots": {"on": None},
                         "passes": {"key": None},
                     },
-                    {  # squadra di un altro girone: va ignorata
-                        "team": {"id": 99},
-                        "league": {"id": 997},
+                    {  # coppa della stessa squadra: va ignorata
+                        "team": {"id": HOME},
+                        "league": {"id": 891, "name": "Coppa Italia Serie D"},
                         "games": {"minutes": 300, "position": "Attacker"},
                     },
                 ],

@@ -39,3 +39,11 @@ def test_invalid_config_is_rejected(mutate: Any, message: str) -> None:
     mutate(data)
     with pytest.raises(ValidationError, match=message):
         SportConfig.model_validate(data)
+
+
+def test_import_plan_parsing() -> None:
+    from prospectlens.cli import parse_plan
+
+    assert parse_plan("138,942,943:2024; 136:2024\n") == [([138, 942, 943], 2024), ([136], 2024)]
+    assert parse_plan("") == []
+    assert parse_plan('"136:2024"') == [([136], 2024)]  # virgolette da .env via make

@@ -61,6 +61,11 @@ def main(argv: list[str] | None = None) -> None:
     csv_.add_argument("--level", type=int, required=True, help="livello nella piramide")
     csv_.add_argument("--group", default=None, help="girone, es. A")
     csv_.add_argument("--season", required=True, help="es. 2024-25")
+    plan = sub.add_parser(
+        "import-plan", help="esegue il piano di import API (API_IMPORT_PLAN), poi calcola"
+    )
+    plan.add_argument("--plan", default=os.environ.get("API_IMPORT_PLAN", ""))
+    plan.add_argument("--budget", type=int, default=int(os.environ.get("API_DAILY_BUDGET", 95)))
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -113,10 +118,47 @@ def main(argv: list[str] | None = None) -> None:
                 report.bundles,
                 report.counts,
             )
-        if args.cmd in ("seed", "compute", "import-api", "import-csv"):
+        if args.cmd == "import-plan":
+            _import_plan(session, sport_id, args.plan, args.budget)
+        if args.cmd in ("seed", "compute", "import-api", "import-csv", "import-plan"):
             _compute(session, sport_id, cfg)
         if args.cmd == "worker":
             _worker(args.hour, sport_id, cfg)
+
+
+def parse_plan(text: str) -> list[tuple[list[int], int]]:
+    """'138,942,943:2024; 136:2024' -> [([138, 942, 943], 2024), ([136], 2024)]."""
+    plan = []
+    for item in text.strip().strip("'\"").replace("\n", ";").split(";"):
+        if item.strip():
+            leagues, season = item.split(":")
+            plan.append(([int(x) for x in leagues.split(",")], int(season)))
+    return plan
+
+
+def _import_plan(session: Session, sport_id: int, plan_text: str, budget: int) -> None:
+    """Importa le voci del piano in ordine finché c'è budget. Le voci già importate si
+    rileggono dalla cache senza consumare richieste: il piano si completa in più giorni."""
+    plan = parse_plan(plan_text)
+    if not plan:
+        log.info("nessun piano di import (API_IMPORT_PLAN vuoto)")
+        return
+    settings = get_settings()
+    client = ApiFootballClient(
+        api_key_from_env(), settings.cache_dir / "api-football", budget=budget
+    )
+    for leagues, season in plan:
+        provider = ApiFootballProvider(client, [LeagueSeason(lg, season) for lg in leagues])
+        try:
+            report = import_provider(session, provider, sport_id)
+        except BudgetExhausted as exc:
+            session.rollback()
+            log.warning(
+                "piano interrotto a %s:%s (%s): riprende al prossimo giro", leagues, season, exc
+            )
+            break
+        log.info("importato %s:%s %s", leagues, season, report.counts)
+    log.info("richieste reali usate: %d", client.used)
 
 
 def _compute(session: Session, sport_id: int, cfg: SportConfig) -> None:
@@ -126,19 +168,28 @@ def _compute(session: Session, sport_id: int, cfg: SportConfig) -> None:
 
 
 def _worker(hour: int, sport_id: int, cfg: SportConfig) -> None:
-    """Ciclo minimo: dorme fino all'ora indicata (UTC), calcola, ripete."""
+    """Ciclo minimo: esegue subito il piano di import (se configurato) e il calcolo, poi
+    ogni giorno all'ora indicata (UTC). L'esecuzione all'avvio recupera i giorni persi se
+    la macchina era spenta."""
     while True:
+        try:
+            with new_session() as session:
+                if os.environ.get("API_IMPORT_PLAN") and os.environ.get("API_FOOTBALL_KEY"):
+                    _import_plan(
+                        session,
+                        sport_id,
+                        os.environ["API_IMPORT_PLAN"],
+                        int(os.environ.get("API_DAILY_BUDGET", 95)),
+                    )
+                _compute(session, sport_id, cfg)
+        except Exception:
+            log.exception("import o calcolo fallito, riprovo al prossimo giro")
         now = datetime.now(UTC)
         run_at = now.replace(hour=hour, minute=0, second=0, microsecond=0)
         if run_at <= now:
             run_at += timedelta(days=1)
-        log.info("prossimo calcolo: %s", run_at.isoformat())
+        log.info("prossimo giro: %s", run_at.isoformat())
         time.sleep((run_at - now).total_seconds())
-        try:
-            with new_session() as session:
-                _compute(session, sport_id, cfg)
-        except Exception:
-            log.exception("calcolo fallito, riprovo domani")
 
 
 if __name__ == "__main__":

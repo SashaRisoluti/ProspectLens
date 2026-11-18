@@ -95,6 +95,7 @@ class Cell:
     verified: bool = False
     finished: int | None = None
     player_pages: int | None = None
+    n_teams: int = 0
     players_league: int = 0  # ID usato per interrogare i giocatori della competizione
     notes: list[str] = field(default_factory=list)
 
@@ -221,6 +222,7 @@ def verify(client: ApiFootballClient, c: Cell, plan: list[tuple[int, int]]) -> N
     st["results"] = YES if done else NO
     st["market_values"] = NOT_OFFERED
     teams = {f["teams"][side]["id"] for f in done for side in ("home", "away")}
+    c.n_teams = len(teams)
     if done:
         # il piano Free non accetta `ids`: una richiesta per partita
         sample = done[len(done) // 2]
@@ -289,15 +291,15 @@ def lenses(c: Cell) -> str:
     return ", ".join(sorted(out)) + tag if out else "nessuna"
 
 
-def estimate_requests(c: Cell) -> int | None:
+def estimate_requests(c: Cell) -> tuple[int, int] | None:
     """Richieste per importare la stagione: calendario, una richiesta per partita conclusa
-    (solo se ci sono formazioni o eventi), pagine dei giocatori (contate solo sul girone
-    usato per interrogare l'intera competizione), infortuni."""
-    if not c.verified or c.finished is None or c.player_pages is None:
+    (solo con formazioni o eventi), statistiche dei giocatori squadra per squadra (fino a
+    3 pagine per squadra: limite del piano Free), infortuni.
+    Restituisce (import base, richieste aggiuntive per il dettaglio delle partite)."""
+    if not c.verified or c.finished is None:
         return None
     details = c.finished if YES in (c.status.get("lineups"), c.status.get("events")) else 0
-    pages = c.player_pages if c.players_league == c.league_id else 0
-    return 1 + details + pages + int(c.declared["injuries"])
+    return 1 + 3 * c.n_teams + int(c.declared["injuries"]), details
 
 
 def write_report(
@@ -348,17 +350,19 @@ def write_report(
         "",
         "| Competizione | ID | Stagione | "
         + " | ".join(HEADERS[t] for t in DATA_TYPES)
-        + " | Lenti | Richieste import | Note |",
+        + " | Lenti | Richieste import (base + dettaglio partite) | Note |",
         "|" + "---|" * (len(DATA_TYPES) + 6),
     ]
     for c in cells:
         est = estimate_requests(c)
+        cost = f"{est[0]} + {est[1]}" if est is not None else "-"
         lines.append(
             f"| {c.name} | {c.league_id} | {c.label} | "
             + " | ".join(cell_value(c, t) for t in DATA_TYPES)
-            + f" | {lenses(c)} | {est if est is not None else '-'} | {'; '.join(c.notes)} |"
+            + f" | {lenses(c)} | {cost} | {'; '.join(c.notes)} |"
         )
-    total = sum(e for c in cells if (e := estimate_requests(c)) is not None)
+    costs = [e for c in cells if (e := estimate_requests(c)) is not None]
+    base, details = sum(e[0] for e in costs), sum(e[1] for e in costs)
     lines += [
         "",
         "## Note",
@@ -377,14 +381,16 @@ def write_report(
             "per partita (il piano Free non accetta il parametro `ids`)."
         ),
         (
-            "- **Statistiche dei giocatori:** il fornitore restituisce i giocatori dell'intera "
-            "competizione (tutti i gironi) anche se si chiede un solo girone. Lo script "
-            "interroga un girone e assegna ogni giocatore al girone della sua squadra."
+            "- **Statistiche dei giocatori:** il piano Free limita l'elenco giocatori a 3 "
+            "pagine (60 giocatori), quindi l'import le scarica squadra per squadra (circa 3 "
+            "richieste a squadra). Il fornitore etichetta le statistiche della Serie C come "
+            "'Serie C - Supercoppa Lega Finals': l'import le riconosce dal nome."
         ),
         (
-            f"- **Stima delle richieste** per importare le stagioni verificate: circa {total} "
-            "(con il limite giornaliero attuale servono più giorni; la cache rende l'import "
-            "riprendibile)."
+            f"- **Stima delle richieste** per le stagioni verificate: circa {base} per l'import "
+            f"base (risultati e statistiche stagionali) e altre {details} per il dettaglio "
+            "delle partite (formazioni ed eventi, necessario per la lente B). Con il limite "
+            "giornaliero l'import richiede più giorni; la cache lo rende riprendibile."
         ),
         f"- Richieste reali usate in questa esecuzione: {client.used}.",
         "",

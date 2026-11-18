@@ -33,6 +33,8 @@ stats:
   duels_won: {column: Duels won per 90, per90: true}
   dribbles_won: {column: Successful dribbles per 90, per90: true}
   tackles_interceptions: {column: Successful defensive actions per 90, per90: true}
+  # portieri (nome colonna da verificare su un export reale)
+  goals_prevented: {column: Prevented goals}
 
 positions:
   GK: GK

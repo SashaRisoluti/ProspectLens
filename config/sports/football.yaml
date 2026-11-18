@@ -101,6 +101,7 @@ metrics:
     roles: [GK, DF, MF, FW]
     higher_is_better: false
     requires: player_stats_basic
+    signal: discipline
     description_it: Cartellini gialli ricevuti ogni 90 minuti.
     how_to_read_it: Più basso è meglio.
     formula_it: ammonizioni / (minuti / 90).
@@ -178,6 +179,41 @@ metrics:
     description_it: Parate ogni 90 minuti.
     how_to_read_it: Più alto è meglio, ma dipende da quanti tiri concede la difesa.
     formula_it: parate / (minuti / 90), con shrinkage.
+
+  # --- portieri: nelle serie minori mancano parate e tiri subiti (vedi docs/metrics.md)
+  - code: goals_conceded_on_pitch
+    name_it: Gol subiti in campo
+    kind: per90
+    stat: goals_conceded_on_pitch
+    roles: [GK]
+    higher_is_better: false
+    requires: lineups
+    description_it: Gol subiti dalla squadra mentre il portiere era in campo, ogni 90 minuti. Si calcola da formazioni, cambi ed eventi.
+    how_to_read_it: Più basso è meglio, ma dipende molto dalla difesa della squadra.
+    formula_it: gol degli avversari tra il minuto di ingresso e quello di uscita / (minuti / 90), con shrinkage.
+  - code: minutes_share
+    name_it: Titolarità
+    kind: ratio
+    numerator: minutes
+    denominator: team_minutes
+    shrinkage_k: 0
+    roles: [GK]
+    higher_is_better: true
+    requires: results
+    signal: usage
+    description_it: Quota dei minuti stagionali della squadra giocati dal portiere.
+    how_to_read_it: Più alto è meglio. Indica la fiducia dell'allenatore, non la qualità delle parate.
+    formula_it: minuti giocati / (partite della squadra × 90).
+  - code: goals_prevented
+    name_it: Gol evitati
+    kind: per90
+    stat: goals_prevented
+    roles: [GK]
+    higher_is_better: true
+    requires: player_stats_advanced
+    description_it: Gol attesi dai tiri subiti meno gol subiti, ogni 90 minuti. Disponibile solo da file CSV (es. Wyscout).
+    how_to_read_it: Più alto è meglio. Sopra zero, il portiere ha subito meno gol di quanto ci si aspettasse.
+    formula_it: (gol attesi contro − gol subiti) / (minuti / 90), con shrinkage.
 
 # Lenti ("Che cosa cerchi?"). Il motore le calcola nella Fase 3.
 goals:

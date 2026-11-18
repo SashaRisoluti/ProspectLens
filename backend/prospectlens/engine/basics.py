@@ -43,9 +43,12 @@ def shrink_ratio(num: np.ndarray, den: np.ndarray, prior: float, k: float) -> np
 
 
 def _metric_values(stats: pd.DataFrame, m: Metric) -> tuple[pd.Series, pd.Series]:
-    """(numeratore, denominatore) per riga; NaN se il dato manca."""
+    """(numeratore, denominatore) per riga; NaN se il dato manca. La chiave si cerca
+    tra le colonne della riga (es. minutes, team_minutes) e poi nelle statistiche grezze."""
 
     def col(key: str | None) -> pd.Series:
+        if key and key in stats.columns:
+            return stats[key].astype(float)
         return stats["raw"].map(lambda r: r.get(key, np.nan) if key else np.nan).astype(float)
 
     if m.kind == "per90":
@@ -100,6 +103,9 @@ def add_metrics(stats: pd.DataFrame, cfg: SportConfig) -> pd.DataFrame:
     weights = pd.Series({f"{m.code}__z": m.weight for m in cfg.metrics})
     zs = df[z_cols]
     df["level_n"] = zs.notna().sum(axis=1)
+    perf = [f"{m.code}__z" for m in cfg.metrics if m.signal == "performance"]
+    df["level_perf_n"] = df[perf].notna().sum(axis=1)
+    df["level_metrics"] = zs.notna().apply(lambda r: [c[:-3] for c in z_cols if r[c]], axis=1)
     # media pesata degli z-score disponibili per la riga
     composite = zs.mul(weights, axis=1).sum(axis=1) / zs.notna().mul(weights, axis=1).sum(axis=1)
     composite[df["level_n"] < cfg.engine.min_metrics_for_level] = np.nan

@@ -41,6 +41,27 @@ Sotto `min_minutes_sample` il giocatore resta visibile ma l'affidabilità è bas
   `min_metrics_for_level` (default 2) il Livello non viene calcolato. Esempio: un
   portiere con le sole statistiche base ha una sola metrica, le ammonizioni.
 
+### Portieri
+
+Nelle serie minori il fornitore non dà parate, tiri subiti o gol subiti dei portieri:
+solo minuti, presenze e cartellini (verificato sulla Serie C, novembre 2026). Per i
+portieri il motore usa:
+
+| Metrica | Da dove | Tipo di segnale |
+|---|---|---|
+| Gol subiti in campo per 90 | formazioni, cambi ed eventi: gol avversari tra ingresso e uscita | prestazione (dipende molto dalla difesa) |
+| Titolarità | minuti / minuti della squadra (dai risultati) | uso da parte dell'allenatore |
+| Gol evitati per 90 | solo da CSV (es. Wyscout, gol attesi contro − gol subiti) | prestazione |
+| Parate per 90 | statistiche avanzate (Serie A e B) | prestazione |
+| Ammonizioni | statistiche base | disciplina |
+
+Ogni metrica ha un tipo di segnale (`signal` nel YAML). **Se il Livello di un giocatore
+non contiene nessuna metrica di prestazione, ad esempio un portiere di Serie C senza
+dettaglio delle partite, l'affidabilità è bassa** e `data_used` lo dichiara
+(`level_has_performance_metrics: false`). Per valutare davvero un portiere di serie
+minore servono il dettaglio delle partite (gol subiti in campo) o un export CSV con i
+gol evitati.
+
 ## 3. Forza delle competizioni
 
 Ogni competizione/girone ha un coefficiente `off` in unità di Livello. Per ogni giocatore

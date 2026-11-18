@@ -75,7 +75,30 @@ def test_percentiles_are_within_competition_and_role(cfg: SportConfig) -> None:
     assert top[1] == pytest.approx(top[2])  # il migliore di ogni lega ha lo stesso percentile
     assert df["shots_on_target__est"].isna().all()  # dato avanzato assente: niente valore
     assert (df["level_n"] == 3).all()
+    assert (df["level_perf_n"] == 2).all()  # gol e assist; le ammonizioni non sono prestazione
+    assert df.loc[0, "level_metrics"] == ["goals", "assists", "yellow_cards"]
     assert df.groupby("competition_id")["z_within"].mean().abs().max() < 1e-9
+
+
+def test_goalkeeper_metrics_from_row_columns(cfg: SportConfig) -> None:
+    df = pd.DataFrame(
+        [
+            {
+                "competition_id": 1,
+                "season_id": 1,
+                "macro": "GK",
+                "minutes": mins,
+                "team_minutes": 3420,
+                "data_types": {"results", "lineups", "player_stats_basic"},
+                "raw": {"yellow_cards": 1.0, "goals_conceded_on_pitch": conc},
+            }
+            for mins, conc in ((3420, 30.0), (3000, 45.0), (1700, 30.0), (500, 5.0))
+        ]
+    )
+    out = add_metrics(df, cfg)
+    assert out.loc[0, "minutes_share__est"] == pytest.approx(1.0)  # K = 0: nessuno shrinkage
+    assert out.loc[0, "goals_conceded_on_pitch__pct"] > out.loc[1, "goals_conceded_on_pitch__pct"]
+    assert (out["level_perf_n"] == 1).all()
 
 
 # --------------------------------------------------------------------------- età e under

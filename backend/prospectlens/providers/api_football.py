@@ -9,6 +9,7 @@ dichiarata. Limiti noti del fornitore: nessun valore di mercato, nessun piede, n
 informazione su prestiti; ruolo solo per macro-ruolo.
 """
 
+import logging
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -30,6 +31,8 @@ from prospectlens.providers.base import (
     SquadEntryRec,
     TeamRec,
 )
+
+log = logging.getLogger(__name__)
 
 # Competizioni di interesse: espressione sul nome API -> (nome, livello). Gli ID si
 # cercano per nome, non sono scritti nel codice.
@@ -93,13 +96,18 @@ class ApiFootballProvider(DataProvider):
     )
 
     def __init__(
-        self, client: ApiFootballClient, targets: list[LeagueSeason], match_details: bool = False
+        self,
+        client: ApiFootballClient,
+        targets: list[LeagueSeason],
+        match_details: bool = False,
+        max_pages: int = 3,  # limite del piano Free per l'elenco giocatori
     ) -> None:
         """match_details: scarica formazioni ed eventi, una richiesta per partita (sul piano
         Free circa 380 per girone). Senza: solo risultati e statistiche stagionali."""
         self.client = client
         self.targets = targets
         self.match_details = match_details
+        self.max_pages = max_pages
 
     def bundles(self) -> Iterator[SeasonBundle]:
         leagues = self.client.get("leagues", {"country": "Italy"}, ttl=timedelta(days=7))
@@ -110,13 +118,6 @@ class ApiFootballProvider(DataProvider):
             if c.get("code") and len(c["code"]) == 2
         }
         info = {item["league"]["id"]: item for item in leagues["response"]}
-        # il fornitore restituisce i giocatori dell'intera competizione (tutti i gironi):
-        # si interroga sempre lo stesso girone, così la cache serve a tutti
-        self._anchor: dict[str, int] = {}
-        for lid, item in sorted(info.items()):
-            found = match_competition(item["league"]["name"])
-            if found:
-                self._anchor.setdefault(found[0], lid)
         for t in self.targets:
             item = info.get(t.league_id)
             if item is None:
@@ -169,8 +170,7 @@ class ApiFootballProvider(DataProvider):
             for fid in done:  # il piano Free non accetta `ids`
                 for d in self._ok(self.client.get("fixtures", {"id": fid})):
                     self._match_detail(d, b, players)
-        anchor = {"league": self._anchor[name], "season": t.season}
-        self._season_stats(anchor, set(teams), b, players)
+        self._season_stats(t, name, set(teams), b, players)
         if season_meta["coverage"].get("injuries"):
             for row in self._ok(self.client.get("injuries", params)):
                 start = _date((row.get("fixture") or {}).get("date"))
@@ -295,56 +295,81 @@ class ApiFootballProvider(DataProvider):
 
     def _season_stats(
         self,
-        params: dict[str, Any],
+        t: LeagueSeason,
+        family: str,
         teams: set[str],
         b: SeasonBundle,
         players: dict[str, PlayerRec],
     ) -> None:
-        """Statistiche stagionali dei giocatori delle squadre di questo girone. Il fornitore a
-        volte le etichetta con un'altra competizione (Serie C: 'Supercoppa Lega Finals'): si
-        filtra per squadra, non per ID competizione."""
-        page, pages = 1, 1
-        while page <= pages:
-            body = self.client.get("players", {**params, "page": page})
-            pages = int((body.get("paging") or {}).get("total") or 1)
-            for row in self._ok(body):
-                p = row["player"]
-                pid = str(p["id"])
-                entries = [
-                    s
-                    for s in row.get("statistics", [])
-                    if str((s.get("team") or {}).get("id")) in teams
-                ]
-                if not entries:
-                    continue
-                pos = POSITION.get(entries[0]["games"].get("position") or "")
-                nat = self._country.get(p.get("nationality") or "")
-                players[pid] = PlayerRec(
+        """Statistiche stagionali, squadra per squadra: il piano Free limita l'elenco
+        giocatori a 3 pagine, quindi non si può scaricarlo per intera competizione.
+
+        Per ogni squadra il fornitore restituisce tutte le competizioni (campionato e
+        coppe). Si tiene la voce del campionato: stesso ID oppure, per le etichette anomale
+        del fornitore (Serie C -> 'Serie C - Supercoppa Lega Finals'), stesso nome di
+        famiglia ('Serie C ...'); le coppe ('Coppa Italia Serie C') sono escluse."""
+
+        def league_entry(stats: list[dict[str, Any]], team: str) -> dict[str, Any] | None:
+            own = [s for s in stats if str((s.get("team") or {}).get("id")) == team]
+            exact = [s for s in own if (s.get("league") or {}).get("id") == t.league_id]
+            family_match = [
+                s for s in own if str((s.get("league") or {}).get("name", "")).startswith(family)
+            ]
+            candidates = exact or family_match
+            return candidates[0] if candidates else None
+
+        for team in sorted(teams):
+            page, pages = 1, 1
+            while page <= min(pages, self.max_pages):
+                body = self.client.get("players", {"team": team, "season": t.season, "page": page})
+                pages = int((body.get("paging") or {}).get("total") or 1)
+                if page == 1 and pages > self.max_pages:
+                    log.warning(
+                        "squadra %s: %d pagine di giocatori, il piano ne consente %d",
+                        team,
+                        pages,
+                        self.max_pages,
+                    )
+                for row in self._ok(body):
+                    s = league_entry(row.get("statistics", []), team)
+                    if s is not None:
+                        self._add_player(row["player"], s, team, b, players)
+                page += 1
+
+    def _add_player(
+        self,
+        p: dict[str, Any],
+        s: dict[str, Any],
+        team: str,
+        b: SeasonBundle,
+        players: dict[str, PlayerRec],
+    ) -> None:
+        pid = str(p["id"])
+        pos = POSITION.get(s["games"].get("position") or "")
+        nat = self._country.get(p.get("nationality") or "")
+        players[pid] = PlayerRec(
+            pid,
+            p.get("firstname") or "",
+            p.get("lastname") or p.get("name") or "",
+            _date((p.get("birth") or {}).get("date")),
+            (nat,) if nat else (),
+            None,
+            _height(p.get("height")),
+            pos or (players[pid].primary_position if pid in players else "MF"),
+        )
+        b.squad.append(SquadEntryRec(pid, team, "unknown"))
+        minutes = int(s["games"].get("minutes") or 0)
+        if minutes:
+            b.stats.append(
+                PlayerSeasonStatRec(
                     pid,
-                    p.get("firstname") or "",
-                    p.get("lastname") or p.get("name") or "",
-                    _date((p.get("birth") or {}).get("date")),
-                    (nat,) if nat else (),
-                    None,
-                    _height(p.get("height")),
-                    pos or (players[pid].primary_position if pid in players else "MF"),
+                    team,
+                    minutes,
+                    int(s["games"].get("appearences") or 0),
+                    int(s["games"].get("lineups") or 0),
+                    _season_values(s),
                 )
-                for s in entries:
-                    team = str(s["team"]["id"])
-                    minutes = int(s["games"].get("minutes") or 0)
-                    b.squad.append(SquadEntryRec(pid, team, "unknown"))
-                    if minutes:
-                        b.stats.append(
-                            PlayerSeasonStatRec(
-                                pid,
-                                team,
-                                minutes,
-                                int(s["games"].get("appearences") or 0),
-                                int(s["games"].get("lineups") or 0),
-                                _season_values(s),
-                            )
-                        )
-            page += 1
+            )
 
 
 def _season_values(s: dict[str, Any]) -> dict[str, float]:
