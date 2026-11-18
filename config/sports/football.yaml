@@ -1,0 +1,217 @@
+# Configurazione dello sport "calcio".
+# Fonte di verità per ruoli, metriche, soglie, curve d'età e lenti.
+# La pipeline copia metriche e lenti nel database; l'API le espone al frontend.
+
+sport:
+  code: football
+  name_it: Calcio
+
+# Unità di normalizzazione delle statistiche di volume (per 90 minuti).
+normalization:
+  unit: minutes
+  per: 90
+
+age:
+  max_search_age: 25          # tetto del filtro età nella ricerca
+  max_search_age_by_goal:     # eccezioni per lente
+    longevity: 28
+
+thresholds:
+  min_minutes_sample: 450     # sotto: "campione insufficiente"
+  valid_season_minutes: 900   # minuti minimi per contare una stagione come valida
+  default_shrinkage_k: 10     # K dello shrinkage bayesiano, se la metrica non lo specifica
+
+# Tipi di dato che una competizione/stagione può avere o no.
+# coverage_check.py e i provider usano questi codici.
+data_types:
+  - {code: results, name_it: "Risultati delle partite"}
+  - {code: lineups, name_it: "Formazioni"}
+  - {code: substitutions, name_it: "Sostituzioni"}
+  - {code: events, name_it: "Eventi (gol, assist, cartellini)"}
+  - {code: player_stats_basic, name_it: "Statistiche base (minuti, gol, assist, cartellini)"}
+  - {code: player_stats_advanced, name_it: "Statistiche avanzate (tiri, passaggi chiave, contrasti...)"}
+  - {code: injuries, name_it: "Infortuni"}
+  - {code: market_values, name_it: "Valori di mercato"}
+
+roles:
+  macro:
+    - {code: GK, name_it: "Portiere"}
+    - {code: DF, name_it: "Difensore"}
+    - {code: MF, name_it: "Centrocampista"}
+    - {code: FW, name_it: "Attaccante"}
+  specific:
+    - {code: GK, macro: GK, name_it: Portiere}
+    - {code: CB, macro: DF, name_it: Difensore centrale}
+    - {code: FB, macro: DF, name_it: Terzino}
+    - {code: DM, macro: MF, name_it: Mediano}
+    - {code: CM, macro: MF, name_it: Mezzala}
+    - {code: AM, macro: MF, name_it: Trequartista}
+    - {code: W, macro: FW, name_it: Esterno}
+    - {code: ST, macro: FW, name_it: Punta}
+
+# Curve d'età di default per macro-ruolo, in unità di "Livello" (z-score).
+# growth_per_year: crescita attesa per anno prima del picco.
+# decline_per_year: calo atteso per anno dopo il picco.
+# Valori iniziali ragionevoli, non stimati: la pipeline li sostituirà con curve stimate
+# dai dati quando ce ne saranno abbastanza.
+age_curves:
+  GK: {peak_age: 30, growth_per_year: 0.12, decline_per_year: 0.05}
+  DF: {peak_age: 28, growth_per_year: 0.15, decline_per_year: 0.08}
+  MF: {peak_age: 27, growth_per_year: 0.17, decline_per_year: 0.10}
+  FW: {peak_age: 26, growth_per_year: 0.20, decline_per_year: 0.13}
+
+# Coefficienti di forza di default per livello della piramide, in unità di Livello.
+# Ancoraggio: Serie B (livello 2) = 0. Valori iniziali arbitrari, modificabili
+# dall'amministratore e sostituiti dalle stime sui giocatori che cambiano lega.
+league_strength_defaults:
+  1: 0.8
+  2: 0.0
+  3: -0.6
+  4: -1.2
+  5: -1.6
+
+metrics:
+  # kind: per90 = statistica di volume divisa per minuti/90
+  #       ratio = numeratore / denominatore (es. precisione)
+  # requires: tipo di dato necessario (vedi data_types)
+  - code: goals
+    name_it: Gol
+    kind: per90
+    stat: goals
+    roles: [DF, MF, FW]
+    higher_is_better: true
+    requires: player_stats_basic
+    description_it: Gol segnati, rapportati a 90 minuti giocati.
+    how_to_read_it: Più alto è meglio. Un attaccante di buon livello in Serie C supera spesso 0,4.
+    formula_it: gol / (minuti / 90), con shrinkage verso la media di ruolo e lega.
+  - code: assists
+    name_it: Assist
+    kind: per90
+    stat: assists
+    roles: [DF, MF, FW]
+    higher_is_better: true
+    requires: player_stats_basic
+    description_it: Passaggi decisivi per un gol, rapportati a 90 minuti.
+    how_to_read_it: Più alto è meglio.
+    formula_it: assist / (minuti / 90), con shrinkage verso la media di ruolo e lega.
+  - code: yellow_cards
+    name_it: Ammonizioni
+    kind: per90
+    stat: yellow_cards
+    roles: [GK, DF, MF, FW]
+    higher_is_better: false
+    requires: player_stats_basic
+    description_it: Cartellini gialli ricevuti ogni 90 minuti.
+    how_to_read_it: Più basso è meglio.
+    formula_it: ammonizioni / (minuti / 90).
+  - code: shots_on_target
+    name_it: Tiri in porta
+    kind: per90
+    stat: shots_on_target
+    roles: [MF, FW]
+    higher_is_better: true
+    requires: player_stats_advanced
+    description_it: Tiri nello specchio della porta ogni 90 minuti.
+    how_to_read_it: Più alto è meglio.
+    formula_it: tiri in porta / (minuti / 90), con shrinkage.
+  - code: key_passes
+    name_it: Passaggi chiave
+    kind: per90
+    stat: key_passes
+    roles: [DF, MF, FW]
+    higher_is_better: true
+    requires: player_stats_advanced
+    description_it: Passaggi che portano un compagno al tiro, ogni 90 minuti.
+    how_to_read_it: Più alto è meglio.
+    formula_it: passaggi chiave / (minuti / 90), con shrinkage.
+  - code: pass_accuracy
+    name_it: Precisione passaggi
+    kind: ratio
+    numerator: passes_completed
+    denominator: passes
+    roles: [GK, DF, MF, FW]
+    higher_is_better: true
+    requires: player_stats_advanced
+    description_it: Quota di passaggi arrivati a un compagno.
+    how_to_read_it: Più alto è meglio. Dipende molto dallo stile di gioco della squadra.
+    formula_it: passaggi riusciti / passaggi tentati.
+  - code: tackles_interceptions
+    name_it: Contrasti e intercetti
+    kind: per90
+    stat: tackles_interceptions
+    roles: [DF, MF]
+    higher_is_better: true
+    requires: player_stats_advanced
+    description_it: Palloni recuperati con un contrasto o un intercetto, ogni 90 minuti.
+    how_to_read_it: Più alto è meglio, ma dipende da quanto la squadra difende.
+    formula_it: (contrasti + intercetti) / (minuti / 90), con shrinkage.
+  - code: duels_won_pct
+    name_it: Duelli vinti
+    kind: ratio
+    numerator: duels_won
+    denominator: duels
+    roles: [DF, MF, FW]
+    higher_is_better: true
+    requires: player_stats_advanced
+    description_it: Quota di duelli (a terra e aerei) vinti.
+    how_to_read_it: Più alto è meglio.
+    formula_it: duelli vinti / duelli disputati.
+  - code: dribbles
+    name_it: Dribbling riusciti
+    kind: per90
+    stat: dribbles_won
+    roles: [MF, FW]
+    higher_is_better: true
+    requires: player_stats_advanced
+    description_it: Dribbling riusciti ogni 90 minuti.
+    how_to_read_it: Più alto è meglio.
+    formula_it: dribbling riusciti / (minuti / 90), con shrinkage.
+  - code: saves
+    name_it: Parate
+    kind: per90
+    stat: saves
+    roles: [GK]
+    higher_is_better: true
+    requires: player_stats_advanced
+    description_it: Parate ogni 90 minuti.
+    how_to_read_it: Più alto è meglio, ma dipende da quanti tiri concede la difesa.
+    formula_it: parate / (minuti / 90), con shrinkage.
+
+# Lenti ("Che cosa cerchi?"). Il motore le calcola nella Fase 3.
+goals:
+  - code: growth
+    letter: A
+    name_it: Crescita rapida
+    tagline_it: Chi sta salendo più in fretta di quanto l'età farebbe prevedere.
+    requires: [player_stats_basic]
+    min_valid_seasons: 2
+    default_sort: growth_score
+    columns: [growth_score, level_slope, growth_vs_expected, context_jump, seasons_observed]
+    suggested_filters: {age_max: 21}
+    measures_it: La velocità con cui il Livello del giocatore aumenta, al netto della forza della lega e rispetto ai coetanei dello stesso ruolo.
+    not_measures_it: Il livello attuale assoluto, il valore di mercato, le qualità caratteriali.
+    when_to_trust_it: Con almeno 3 stagioni valide e minuti sopra soglia. Con 2 stagioni l'affidabilità è bassa.
+  - code: impact
+    letter: B
+    name_it: Impatto sui risultati
+    tagline_it: Chi fa vincere la squadra quando è in campo.
+    requires: [lineups, substitutions, events]
+    default_sort: impact_score
+    columns: [impact_score, onoff_goal_diff_p90, onoff_ppm, decisive_points, minutes]
+    suggested_filters: {min_minutes: 900}
+    measures_it: Quanto cambiano differenza reti e punti della squadra con il giocatore in campo, al netto dei compagni, degli avversari e del fattore campo.
+    not_measures_it: Il contributo individuale visibile nelle statistiche; non è confrontabile in modo affidabile tra squadre molto diverse.
+    when_to_trust_it: "Con molti minuti e molti cambi in rosa. È la lente più rumorosa: guarda sempre l'intervallo di incertezza."
+  - code: longevity
+    letter: C
+    name_it: Longevità
+    tagline_it: Chi mantiene a lungo un livello medio-alto.
+    requires: [player_stats_basic]
+    thresholds_percentile: {medium: 50, high: 70}
+    horizon_seasons: 3
+    default_sort: longevity_score
+    columns: [longevity_score, seasons_above_threshold, consistency, availability, seasons_observed]
+    suggested_filters: {}
+    measures_it: Quante stagioni di fila il giocatore è rimasto sopra la soglia di Livello, quanto è costante e quanto è disponibile, e la probabilità che resti sopra soglia.
+    not_measures_it: Il potenziale di crescita; gli infortuni, se non ci sono dati diretti (si usa la quota di partite giocate).
+    when_to_trust_it: Con almeno 3 stagioni osservate. Mostra sempre il numero di stagioni accanto al punteggio.
