@@ -366,3 +366,8 @@ Decisione aperta: come coprire la Serie D (CSV del club, piano a pagamento, altr
 
 **Decisione (18 novembre 2026):** opzione 1. L'MVP si concentra su Serie C e Primavera 1;
 la Serie D resta con anagrafica e risultati finché un club non fornisce un export CSV.
+
+**Decisione (18 novembre 2026):** si resta sul piano Free di API-Football. La Fase 4 parte
+quando l'import automatico dei dati reali (Serie C e Serie B, stagioni 2022-2024) è
+abbastanza avanzato da costruire su dati veri: completamento stimato attorno al 26 novembre.
+Avanzamento: `make real-status`.
