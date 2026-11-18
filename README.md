@@ -4,15 +4,15 @@ Piattaforma di scouting data-driven per club italiani di fascia medio-bassa: tro
 giovani talenti in Serie C, Serie D e categorie inferiori con tre "lenti" di ricerca
 (crescita rapida, impatto sui risultati, longevità).
 
-Stato: **Fase 2** (fonti dati reali: API-Football e CSV). Piano completo: [docs/PLAN.md](docs/PLAN.md).
+Stato: **Fase 3** (motore delle metriche e tre lenti). Formule: [docs/metrics.md](docs/metrics.md). Piano completo: [docs/PLAN.md](docs/PLAN.md).
 
 ## Avvio rapido
 
 Requisiti: Docker, [uv](https://docs.astral.sh/uv/) (solo per test e lint locali), `make`.
 
 ```sh
-make up                 # crea .env da .env.example, avvia db e api
-make seed               # genera e importa i dati mock (SCALE=tiny|demo|full, default demo)
+make up                 # crea .env da .env.example, avvia db, api e worker
+make seed               # dati mock + calcolo dei punteggi (SCALE=tiny|demo|full, default demo)
 curl localhost:8000/healthz
 ```
 
@@ -51,7 +51,8 @@ backend/prospectlens/
   config.py         validazione di config/sports/*.yaml
   db/models.py      modello dati (SQLAlchemy), migrazioni in backend/alembic
   providers/        DataProvider: Mock, ApiFootball (+ client con cache), CsvImport
-  pipeline/         import idempotente, sincronizzazione della configurazione
+  engine/           motore: per 90, shrinkage, percentili, forza leghe, età, lenti A B C
+  pipeline/         import, sincronizzazione configurazione, calcolo (compute)
   api/              FastAPI
 config/sports/football.yaml   ruoli, metriche, soglie, curve d'età, lenti
 config/csv/                   mappature delle colonne dei file CSV

@@ -250,6 +250,23 @@ class InjuryRecord(Base):
     source_id: Mapped[int] = _fk("data_source.id")
 
 
+class LeagueStrength(Base):
+    """Coefficiente di forza per competizione/girone, in unità di Livello.
+    source: estimated (stimato dalla pipeline) | admin (fissato dall'amministratore,
+    la pipeline non lo sovrascrive)."""
+
+    __tablename__ = "league_strength"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    competition_id: Mapped[int] = mapped_column(ForeignKey("competition.id"), unique=True)
+    coefficient: Mapped[float] = mapped_column(Float)
+    default_coefficient: Mapped[float] = mapped_column(Float)
+    n_movers: Mapped[int] = mapped_column(Integer, default=0)
+    source: Mapped[str] = mapped_column(String(16), default="estimated")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 # --------------------------------------------------------------------------- definizioni
 
 

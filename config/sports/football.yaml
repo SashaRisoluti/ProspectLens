@@ -131,6 +131,7 @@ metrics:
     denominator: passes
     roles: [GK, DF, MF, FW]
     higher_is_better: true
+    shrinkage_k: 50           # in passaggi/duelli tentati
     requires: player_stats_advanced
     description_it: Quota di passaggi arrivati a un compagno.
     how_to_read_it: Più alto è meglio. Dipende molto dallo stile di gioco della squadra.
@@ -152,6 +153,7 @@ metrics:
     denominator: duels
     roles: [DF, MF, FW]
     higher_is_better: true
+    shrinkage_k: 20           # in passaggi/duelli tentati
     requires: player_stats_advanced
     description_it: Quota di duelli (a terra e aerei) vinti.
     how_to_read_it: Più alto è meglio.
@@ -215,3 +217,25 @@ goals:
     measures_it: Quante stagioni di fila il giocatore è rimasto sopra la soglia di Livello, quanto è costante e quanto è disponibile, e la probabilità che resti sopra soglia.
     not_measures_it: Il potenziale di crescita; gli infortuni, se non ci sono dati diretti (si usa la quota di partite giocate).
     when_to_trust_it: Con almeno 3 stagioni osservate. Mostra sempre il numero di stagioni accanto al punteggio.
+
+# Parametri del motore delle metriche (formule in docs/metrics.md).
+engine:
+  min_metrics_for_level: 2        # sotto: Livello non calcolato per quel ruolo e lega
+  league_strength_prior_weight: 5 # quanto i coefficienti di default resistono ai dati
+  age_curve_min_rows: 100         # sotto: curve d'età di default (age_curves)
+  seed: 42
+  growth:                         # lente A
+    window_seasons: 4
+    prior_sd: 0.2
+    noise_floor_sd: 0.25
+    jump_weight: 0.5
+    jump_tolerance: 0.1
+  impact:                         # lente B
+    onoff_shrinkage_k: 10
+    ridge_alpha: 10
+    bootstrap: 50
+    assist_weight: 0.5
+    min_off_minutes: 270
+  longevity:                      # lente C
+    regularization_c: 1.0
+    bootstrap: 30

@@ -62,6 +62,7 @@ class Metric(_Strict):
     higher_is_better: bool
     requires: str
     shrinkage_k: float | None = None
+    weight: float = 1.0  # peso nel Livello (media pesata degli z-score delle metriche)
     description_it: str
     how_to_read_it: str
     formula_it: str
@@ -92,6 +93,37 @@ class Goal(_Strict):
     horizon_seasons: int | None = None
 
 
+class GrowthParams(_Strict):
+    window_seasons: int = 4
+    prior_sd: float = 0.2  # incertezza a priori sulla pendenza attorno alla crescita attesa
+    noise_floor_sd: float = 0.25  # rumore minimo del Livello tra stagioni
+    jump_weight: float = 0.5
+    jump_tolerance: float = 0.1
+
+
+class ImpactParams(_Strict):
+    onoff_shrinkage_k: float = 10.0  # in partite intere (90 minuti)
+    ridge_alpha: float = 10.0
+    bootstrap: int = 50
+    assist_weight: float = 0.5
+    min_off_minutes: int = 270
+
+
+class LongevityParams(_Strict):
+    regularization_c: float = 1.0
+    bootstrap: int = 30
+
+
+class EngineConfig(_Strict):
+    min_metrics_for_level: int = 2
+    league_strength_prior_weight: float = 5.0
+    age_curve_min_rows: int = 100
+    seed: int = 42
+    growth: GrowthParams = GrowthParams()
+    impact: ImpactParams = ImpactParams()
+    longevity: LongevityParams = LongevityParams()
+
+
 class SportConfig(_Strict):
     sport: NamedCode
     normalization: Normalization
@@ -103,6 +135,7 @@ class SportConfig(_Strict):
     league_strength_defaults: dict[int, float]
     metrics: list[Metric]
     goals: list[Goal]
+    engine: EngineConfig = EngineConfig()
 
     @model_validator(mode="after")
     def _check_references(self) -> Self:
@@ -142,8 +175,13 @@ class SportConfig(_Strict):
 
     @property
     def macro_of(self) -> dict[str, str]:
-        """Ruolo specifico -> macro-ruolo."""
-        return {r.code: r.macro for r in self.roles.specific}
+        """Ruolo specifico (o macro-ruolo, se la fonte non dà di più) -> macro-ruolo."""
+        return {r.code: r.code for r in self.roles.macro} | {
+            r.code: r.macro for r in self.roles.specific
+        }
+
+    def goal(self, code: str) -> Goal:
+        return next(g for g in self.goals if g.code == code)
 
 
 def load_sport_config(path: Path) -> SportConfig:

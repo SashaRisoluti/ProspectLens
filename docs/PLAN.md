@@ -363,3 +363,6 @@ API-Football (100 richieste al giorno).
 - **Valori di mercato:** non offerti dal fornitore.
 
 Decisione aperta: come coprire la Serie D (CSV del club, piano a pagamento, altra fonte).
+
+**Decisione (18 novembre 2026):** opzione 1. L'MVP si concentra su Serie C e Primavera 1;
+la Serie D resta con anagrafica e risultati finché un club non fornisce un export CSV.

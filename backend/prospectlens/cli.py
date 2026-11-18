@@ -2,12 +2,16 @@
 
 import argparse
 import logging
+import os
 import time
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
-from prospectlens.config import load_sport
+from sqlalchemy.orm import Session
+
+from prospectlens.config import SportConfig, load_sport
 from prospectlens.db.session import new_session
+from prospectlens.pipeline.compute import compute
 from prospectlens.pipeline.importer import import_provider
 from prospectlens.pipeline.sync_config import sync_config
 from prospectlens.providers.api_football import ApiFootballProvider, LeagueSeason
@@ -29,6 +33,9 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="prospectlens")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("sync-config", help="copia metriche e lenti dal YAML al database")
+    sub.add_parser("compute", help="calcola metriche, Indice talento e lenti")
+    worker = sub.add_parser("worker", help="esegue `compute` ogni giorno all'ora indicata")
+    worker.add_argument("--hour", type=int, default=int(os.environ.get("PIPELINE_HOUR", 5)))
     seed = sub.add_parser("seed", help="genera e importa i dati mock")
     seed.add_argument("--scale", choices=sorted(SCALES), default="demo")
     seed.add_argument("--seed", type=int, default=42)
@@ -106,6 +113,32 @@ def main(argv: list[str] | None = None) -> None:
                 report.bundles,
                 report.counts,
             )
+        if args.cmd in ("seed", "compute", "import-api", "import-csv"):
+            _compute(session, sport_id, cfg)
+        if args.cmd == "worker":
+            _worker(args.hour, sport_id, cfg)
+
+
+def _compute(session: Session, sport_id: int, cfg: SportConfig) -> None:
+    t = time.monotonic()
+    result = compute(session, sport_id, cfg)
+    log.info("calcolo completato in %.0f s: %s", time.monotonic() - t, result)
+
+
+def _worker(hour: int, sport_id: int, cfg: SportConfig) -> None:
+    """Ciclo minimo: dorme fino all'ora indicata (UTC), calcola, ripete."""
+    while True:
+        now = datetime.now(UTC)
+        run_at = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+        if run_at <= now:
+            run_at += timedelta(days=1)
+        log.info("prossimo calcolo: %s", run_at.isoformat())
+        time.sleep((run_at - now).total_seconds())
+        try:
+            with new_session() as session:
+                _compute(session, sport_id, cfg)
+        except Exception:
+            log.exception("calcolo fallito, riprovo domani")
 
 
 if __name__ == "__main__":

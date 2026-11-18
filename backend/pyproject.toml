@@ -12,6 +12,8 @@ dependencies = [
     "pydantic>=2.7",
     "pyyaml>=6.0",
     "numpy>=2.0",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
 ]
 
 [project.scripts]
@@ -50,7 +52,7 @@ plugins = ["pydantic.mypy"]
 exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]
-module = ["alembic.*"]
+module = ["alembic.*", "pandas.*", "sklearn.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
