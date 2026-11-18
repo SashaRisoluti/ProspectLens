@@ -1,0 +1,99 @@
+# Mappatura di un export CSV "stile Wyscout" verso i campi di ProspectLens.
+# ATTENZIONE: i nomi delle colonne vanno verificati su un export reale del club e
+# corretti qui, senza toccare il codice. Le colonne assenti dal file vengono ignorate.
+
+delimiter: ","
+
+columns:
+  player_name: Player          # obbligatoria
+  team: Team                   # obbligatoria
+  minutes: Minutes played      # obbligatoria
+  position: Position           # es. "CF, LW": il primo è il ruolo principale
+  birth_date: Birth date
+  age: Age                     # usata solo se manca la data di nascita
+  nationality: Passport country  # più paesi separati da virgola
+  foot: Foot
+  height_cm: Height
+  contract_until: Contract expires
+  on_loan: On loan             # "yes"/"no"
+  market_value_eur: Market value
+  appearances: Matches played
+
+# statistica ProspectLens -> colonna. per90: true se il file la esprime già per 90 minuti
+# (verrà riconvertita in totale stagionale).
+stats:
+  goals: {column: Goals}
+  assists: {column: Assists}
+  yellow_cards: {column: Yellow cards}
+  red_cards: {column: Red cards}
+  shots_on_target: {column: Shots on target per 90, per90: true}
+  key_passes: {column: Key passes per 90, per90: true}
+  passes: {column: Passes per 90, per90: true}
+  duels: {column: Duels per 90, per90: true}
+  duels_won: {column: Duels won per 90, per90: true}
+  dribbles_won: {column: Successful dribbles per 90, per90: true}
+  tackles_interceptions: {column: Successful defensive actions per 90, per90: true}
+
+positions:
+  GK: GK
+  CB: CB
+  LCB: CB
+  RCB: CB
+  LB: FB
+  RB: FB
+  LWB: FB
+  RWB: FB
+  DMF: DM
+  LDMF: DM
+  RDMF: DM
+  CMF: CM
+  LCMF: CM
+  RCMF: CM
+  AMF: AM
+  LAMF: AM
+  RAMF: AM
+  LW: W
+  RW: W
+  LWF: W
+  RWF: W
+  CF: ST
+
+foot:
+  right: right
+  left: left
+  both: both
+
+# nome del paese nel file -> codice ISO a due lettere. Aggiungi qui i paesi mancanti:
+# un paese non mappato viene saltato e segnalato nel log.
+countries:
+  Italy: IT
+  Albania: AL
+  Argentina: AR
+  Belgium: BE
+  Brazil: BR
+  Cameroon: CM
+  Croatia: HR
+  Denmark: DK
+  France: FR
+  Gambia: GM
+  Germany: DE
+  Ghana: GH
+  Guinea: GN
+  Ivory Coast: CI
+  Côte d'Ivoire: CI
+  Kosovo: XK
+  Mali: ML
+  Morocco: MA
+  Netherlands: NL
+  Nigeria: NG
+  Poland: PL
+  Portugal: PT
+  Romania: RO
+  Senegal: SN
+  Serbia: RS
+  Slovenia: SI
+  Spain: ES
+  Switzerland: CH
+  Tunisia: TN
+  Ukraine: UA
+  Uruguay: UY

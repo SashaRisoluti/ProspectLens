@@ -4,7 +4,7 @@ Piattaforma di scouting data-driven per club italiani di fascia medio-bassa: tro
 giovani talenti in Serie C, Serie D e categorie inferiori con tre "lenti" di ricerca
 (crescita rapida, impatto sui risultati, longevità).
 
-Stato: **Fase 1** (struttura, database, dati mock). Piano completo: [docs/PLAN.md](docs/PLAN.md).
+Stato: **Fase 2** (fonti dati reali: API-Football e CSV). Piano completo: [docs/PLAN.md](docs/PLAN.md).
 
 ## Avvio rapido
 
@@ -25,6 +25,24 @@ Altri comandi:
 | `make fmt` | corregge formattazione e import |
 | `make migration MSG="..."` | genera una migrazione Alembic dai modelli |
 | `make down` | ferma lo stack |
+| `make coverage` | verifica la copertura di API-Football e scrive [docs/data-coverage.md](docs/data-coverage.md) (consuma richieste; `ARGS="--budget 50"`) |
+
+## Dati reali
+
+La chiave va in `.env` (`API_FOOTBALL_KEY`). Le risposte del fornitore sono salvate in
+`data/cache/` (non versionata): ripetere un comando non consuma richieste.
+
+```sh
+# una o più competizioni (ID da docs/data-coverage.md), stagione = anno di inizio
+docker compose exec api prospectlens import-api --league 426 --season 2024 --budget 90
+
+# file CSV del club (mappatura colonne in config/csv/wyscout.yaml)
+docker compose exec api prospectlens import-csv /app/data/export.csv \
+    --competition "Serie D" --level 4 --group A --season 2024-25
+```
+
+Se il budget di richieste finisce a metà, il comando si ferma senza importare la
+competizione incompleta: rilancialo il giorno dopo e riparte dalla cache.
 
 ## Struttura
 
@@ -32,10 +50,12 @@ Altri comandi:
 backend/prospectlens/
   config.py         validazione di config/sports/*.yaml
   db/models.py      modello dati (SQLAlchemy), migrazioni in backend/alembic
-  providers/        DataProvider: MockProvider (Fase 1), ApiFootball e CSV (Fase 2)
+  providers/        DataProvider: Mock, ApiFootball (+ client con cache), CsvImport
   pipeline/         import idempotente, sincronizzazione della configurazione
   api/              FastAPI
 config/sports/football.yaml   ruoli, metriche, soglie, curve d'età, lenti
+config/csv/                   mappature delle colonne dei file CSV
+scripts/coverage_check.py     verifica della copertura dei dati
 ```
 
 ## Dati mock

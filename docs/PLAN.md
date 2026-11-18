@@ -337,3 +337,29 @@ report di copertura mostra dati utilizzabili. Campionati esteri minori: dopo l'M
 Il `.gitignore` esclude `CLAUDE.md` e gli altri file degli assistenti di codice. Vuoi
 anche che i messaggi di commit non contengano la riga `Co-Authored-By` che cita
 l'assistente?
+
+---
+
+## Esito della Fase 2 (18 novembre 2026)
+
+Dettagli in [data-coverage.md](data-coverage.md). Verifiche fatte con il piano **Free** di
+API-Football (100 richieste al giorno).
+
+- **Stagioni accessibili:** solo 2022-23, 2023-24, 2024-25. Né la stagione in corso né
+  il 2025-26.
+- **Serie C (3 gironi):** risultati, formazioni, cambi, eventi, statistiche base
+  (minuti, presenze, gol). Nessuna statistica avanzata. Lenti A, B, C calcolabili.
+  Le statistiche dei giocatori arrivano per tutta la Serie C insieme, etichettate come
+  "Supercoppa Lega Finals": il provider le assegna al girone in base alla squadra.
+- **Serie D (9 gironi):** solo risultati, marcatori e rose (anagrafica). **Minuti mai
+  disponibili**, formazioni dichiarate solo dal 2025-26 (fuori dal piano Free).
+  Con questa fonte nessuna lente è calcolabile per la Serie D.
+- **Primavera 1:** come la Serie C. **Primavera 2:** senza minuti.
+- **Serie A e B:** tutto, incluse statistiche avanzate.
+- **Costo:** formazioni ed eventi richiedono una richiesta per partita (il piano Free
+  non accetta richieste multiple): circa 1.140 richieste per una stagione di Serie C,
+  cioè circa 12 giorni con il piano Free. Le statistiche stagionali costano circa 120
+  richieste per stagione e per competizione.
+- **Valori di mercato:** non offerti dal fornitore.
+
+Decisione aperta: come coprire la Serie D (CSV del club, piano a pagamento, altra fonte).
