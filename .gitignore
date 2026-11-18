@@ -1,0 +1,61 @@
+# --- File degli assistenti di codice (mai nel repository) ---
+CLAUDE.md
+CLAUDE.local.md
+**/CLAUDE.md
+.claude/
+.claude-mem/
+AGENTS.md
+**/AGENTS.md
+GEMINI.md
+.gemini/
+.cursor/
+.cursorrules
+.cursorignore
+.windsurf/
+.windsurfrules
+.github/copilot-instructions.md
+.github/instructions/
+.aider*
+.continue/
+.codex/
+.clinerules
+.roo/
+.kiro/
+.junie/
+.ai/
+.mcp.json
+
+# --- Segreti ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+playwright-report/
+test-results/
+
+# --- Dati locali ---
+data/cache/
+data/uploads/
+*.dump
+
+# --- Sistema ---
+.DS_Store
+.idea/
+.vscode/
