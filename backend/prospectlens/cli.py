@@ -170,7 +170,7 @@ def _compute(session: Session, sport_id: int, cfg: SportConfig) -> None:
 def _worker(hour: int, sport_id: int, cfg: SportConfig) -> None:
     """Ciclo minimo: esegue subito il piano di import (se configurato) e il calcolo, poi
     ogni giorno all'ora indicata (UTC). L'esecuzione all'avvio recupera i giorni persi se
-    la macchina era spenta."""
+    la macchina era spenta; dopo uno standby il giro parte entro un minuto dal risveglio."""
     while True:
         try:
             with new_session() as session:
@@ -189,7 +189,8 @@ def _worker(hour: int, sport_id: int, cfg: SportConfig) -> None:
         if run_at <= now:
             run_at += timedelta(days=1)
         log.info("prossimo giro: %s", run_at.isoformat())
-        time.sleep((run_at - now).total_seconds())
+        while datetime.now(UTC) < run_at:  # a passi brevi: lo sleep non conta lo standby
+            time.sleep(60)
 
 
 if __name__ == "__main__":
