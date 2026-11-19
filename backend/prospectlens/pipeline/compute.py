@@ -275,7 +275,13 @@ def _score_impact(
     valid_min = cfg.thresholds.valid_season_minutes
     out = []
     for r in ps.itertuples():
-        base = {"player_id": r.player_id, "season_id": r.season_id, "macro": r.macro}
+        base = {
+            "player_id": r.player_id,
+            "season_id": r.season_id,
+            "macro": r.macro,
+            "ci_low_raw": np.nan,  # colonne presenti anche se nessuna riga è "ok"
+            "ci_high_raw": np.nan,
+        }
         key = (r.player_id, r.season_id)
         if (r.competition_id, r.season_id) not in comp_ok:
             out.append(

@@ -69,3 +69,17 @@ def test_compute_on_mock_data(db: Session, cfg: SportConfig) -> None:
     # il calcolo è ripetibile: stessi conteggi, nessun duplicato
     compute(db, sport_id, cfg)
     assert db.scalar(select(func.count()).select_from(m.PlayerGoalScore)) == result["goal_scores"]
+
+
+def test_compute_without_match_details(db: Session, cfg: SportConfig) -> None:
+    # Come i dati reali sul piano Free: nessuna competizione ha formazioni ed eventi
+    sport_id = sync_config(db, cfg)
+    import_provider(db, MockProvider(cfg, "tiny", seed=7), sport_id)
+    for cs in db.scalars(select(m.CompetitionSeason)):
+        cs.data_types = [t for t in cs.data_types if t not in ("lineups", "events")]
+    db.flush()
+    compute(db, sport_id, cfg)
+    statuses = set(
+        db.scalars(select(m.PlayerGoalScore.status).where(m.PlayerGoalScore.goal_code == "impact"))
+    )
+    assert statuses == {"not_available"}
