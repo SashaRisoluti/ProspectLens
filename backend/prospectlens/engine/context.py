@@ -53,7 +53,7 @@ def fit_age_curves(ps: pd.DataFrame, cfg: SportConfig) -> AgeCurves:
     """ps: una riga per giocatore-stagione valida con age, level, minutes, macro."""
     curves = AgeCurves(cfg.age_curves)
     for macro, curve in cfg.age_curves.items():
-        d = ps[(ps["macro"] == macro) & ps["level"].notna()]
+        d = ps[(ps["macro"] == macro) & ps["level"].notna() & ps["age"].notna()]
         if d.empty:
             continue
         if len(d) >= cfg.engine.age_curve_min_rows:

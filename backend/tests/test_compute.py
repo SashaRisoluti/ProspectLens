@@ -83,3 +83,23 @@ def test_compute_without_match_details(db: Session, cfg: SportConfig) -> None:
         db.scalars(select(m.PlayerGoalScore.status).where(m.PlayerGoalScore.goal_code == "impact"))
     )
     assert statuses == {"not_available"}
+
+
+def test_compute_with_missing_birth_dates(db: Session, cfg: SportConfig) -> None:
+    # Dati reali: alcuni giocatori non hanno la data di nascita. Curve d'età stimate, non default
+    th = cfg.thresholds.model_copy(update={"valid_season_minutes": 450, "min_minutes_sample": 200})
+    engine = cfg.engine.model_copy(update={"age_curve_min_rows": 5})
+    cfg = cfg.model_copy(update={"thresholds": th, "engine": engine})
+    sport_id = sync_config(db, cfg)
+    import_provider(db, MockProvider(cfg, "tiny", seed=7), sport_id)
+    players = list(db.scalars(select(m.Player).order_by(m.Player.id)))
+    for p in players[::5]:
+        p.birth_date = None
+    db.flush()
+    result = compute(db, sport_id, cfg)
+    assert result["goal_scores"] == 3 * result["player_seasons"]
+    no_age = set(db.scalars(select(m.Player.id).where(m.Player.birth_date.is_(None))))
+    for s in db.scalars(select(m.PlayerGoalScore).where(m.PlayerGoalScore.status == "ok")):
+        assert s.score is not None
+        if s.goal_code in ("growth", "longevity"):
+            assert s.player_id not in no_age

@@ -84,7 +84,7 @@ def growth_lens(ps: pd.DataFrame, curves: AgeCurves, cfg: SportConfig) -> pd.Dat
                 & (h["season_year"] > r["season_year"] - p.window_seasons)
             ]
         n = 0 if h is None else len(h)
-        if n < min_n or not (r["valid"] and np.isfinite(r["level"])):
+        if n < min_n or not (r["valid"] and np.isfinite(r["level"]) and np.isfinite(r["age"])):
             out.append(_row(r, "insufficient_history", seasons_used=n))
             continue
         assert h is not None
@@ -223,10 +223,11 @@ def longevity_lens(ps: pd.DataFrame, cfg: SportConfig) -> pd.DataFrame:
     y = longevity_labels(f)
     macros = sorted(cfg.age_curves)
     fill = f[["consistency", "availability"]].median()
-    train = f[y.notna() & f["valid"] & f["level_pct"].notna()]
+    has_age = f["age"].notna()  # senza data di nascita niente proiezione per età
+    train = f[y.notna() & f["valid"] & f["level_pct"].notna() & has_age]
     target = y[train.index].astype(int)
     out_status = pd.Series("insufficient_history", index=f.index)
-    scorable = f["valid"] & f["level_pct"].notna()
+    scorable = f["valid"] & f["level_pct"].notna() & has_age
     probs = pd.Series(np.nan, index=f.index)
     lo, hi = probs.copy(), probs.copy()
     if len(train) >= 30 and target.nunique() == 2:
