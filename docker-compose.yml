@@ -1,5 +1,6 @@
 services:
   db:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?imposta POSTGRES_USER in .env}
@@ -17,6 +18,7 @@ services:
       retries: 20
 
   api:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -38,6 +40,7 @@ services:
       retries: 5
 
   worker:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: backend/Dockerfile
