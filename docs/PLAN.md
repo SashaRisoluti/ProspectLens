@@ -371,3 +371,37 @@ la Serie D resta con anagrafica e risultati finché un club non fornisce un expo
 quando l'import automatico dei dati reali (Serie C e Serie B, stagioni 2022-2024) è
 abbastanza avanzato da costruire su dati veri: completamento stimato attorno al 26 novembre.
 Avanzamento: `make real-status`.
+
+### Esito del controllo sui dati reali (26 novembre 2026)
+
+Import completo: Serie B e i 3 gironi di Serie C, stagioni 2022-23, 2023-24 e 2024-25.
+In totale 4.600 partite e 6.626 giocatori-stagione, nel database `prospectlens_real`.
+
+**Cosa funziona**
+- Serie B: il Livello usa 5-8 metriche per ruolo e la classifica è credibile. In cima ci
+  sono giocatori noti, come Berardi e Laurienté del Sassuolo nel 2024-25.
+- Forza delle leghe stimata da oltre 300 passaggi per lega: Serie B +0,04, gironi di
+  Serie C da −0,51 a −0,68, vicina ai valori di default.
+
+**Difetti trovati e corretti**
+- Calcolo bloccato quando la lente B non è disponibile ovunque o mancano date di nascita.
+  Ora un'età mancante esclude il giocatore dalle curve d'età e dalle lenti A e C.
+- Minuti e partite della squadra incoerenti con le statistiche. In Serie B le partite
+  includevano playoff e playout, mentre le statistiche no; in Serie C il contrario.
+- Assist della Serie C: 0 per tutti tranne un caso isolato, cioè dato non rilevato.
+  Ora un dato diverso da 0 in meno dell'1% delle righe è trattato come mancante.
+
+**Limiti dei dati sul piano Free**
+- Serie C: il fornitore dà solo minuti, presenze, gol e cartellini. Il Livello dei
+  giocatori di movimento usa quindi solo gol e ammonizioni, e per un difensore questo non
+  misura la qualità. Con la nuova regola (meno di 2 metriche di prestazione, quindi
+  affidabilità bassa) tutta la Serie C ha affidabilità bassa. Un piano a pagamento non
+  aggiunge statistiche per la Serie C: la copertura del fornitore è la stessa.
+- Lente B non disponibile: senza dettaglio delle partite mancano formazioni e cambi.
+- 14 squadre-stagione su 240 hanno più di 3 pagine di giocatori, quindi alcuni giocatori
+  mancano. La copertura minuti delle squadre interessate scende fino all'84%.
+- Il 4% dei giocatori non ha la data di nascita: niente Indice talento e niente lenti A e C.
+
+**Come migliorare la Serie C:** dettaglio delle partite (una richiesta per partita; per
+la Serie C 2024-25 sono 1.140 richieste, circa 12 giorni sul piano Free), oppure import
+CSV dal club (es. Wyscout).
