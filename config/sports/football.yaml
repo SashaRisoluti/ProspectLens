@@ -258,6 +258,7 @@ goals:
 # Parametri del motore delle metriche (formule in docs/metrics.md).
 engine:
   min_metrics_for_level: 2        # sotto: Livello non calcolato per quel ruolo e lega
+  min_performance_metrics: 2      # sotto: affidabilità del Livello bassa (es. Serie C: solo gol)
   league_strength_prior_weight: 5 # quanto i coefficienti di default resistono ai dati
   age_curve_min_rows: 100         # sotto: curve d'età di default (age_curves)
   seed: 42

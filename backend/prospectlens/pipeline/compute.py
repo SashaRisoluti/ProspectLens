@@ -100,7 +100,22 @@ def load_stats(session: Session, sport_id: int, cfg: SportConfig) -> pd.DataFram
         r | {"goals_conceded_on_pitch": float(c)} if pd.notna(c) else r
         for r, c in zip(df["raw"], df["conceded"], strict=True)
     ]
+    df["raw"] = _drop_all_zero(df)
     return df.drop(columns="conceded")
+
+
+def _drop_all_zero(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Un dato che vale 0 per tutti in una competizione e stagione non è rilevato dal
+    fornitore (es. assist in Serie C): si toglie, così risulta mancante e non uno 0 falso."""
+    missing: dict[tuple[int, int], set[str]] = {}
+    for key, raws in df.groupby(["competition_id", "season_id"])["raw"]:
+        if len(raws) >= 30:  # con pochi giocatori uno 0 per tutti può essere vero
+            keys = set().union(*raws)
+            missing[key] = {k for k in keys if all(not r.get(k) for r in raws)}
+    return [
+        {k: v for k, v in r.items() if k not in missing.get((c, s), set())}
+        for r, c, s in zip(df["raw"], df["competition_id"], df["season_id"], strict=True)
+    ]
 
 
 def aggregate_player_seasons(rows: pd.DataFrame, cfg: SportConfig) -> pd.DataFrame:
@@ -359,7 +374,8 @@ def _score_impact(
 def _reliability(r: Any, cfg: SportConfig) -> str:
     if not np.isfinite(r.level) or r.minutes < cfg.thresholds.min_minutes_sample:
         return "low"
-    if r.level_perf_n == 0:  # solo minuti e cartellini: indicatori indiretti
+    # poche metriche di prestazione (es. solo gol, o solo minuti e cartellini): Livello indiretto
+    if r.level_perf_n < cfg.engine.min_performance_metrics:
         return "low"
     if r.valid and "player_stats_advanced" in r.data_types:
         return "high"

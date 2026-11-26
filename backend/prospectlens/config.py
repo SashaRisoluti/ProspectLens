@@ -120,6 +120,7 @@ class LongevityParams(_Strict):
 
 class EngineConfig(_Strict):
     min_metrics_for_level: int = 2
+    min_performance_metrics: int = 2
     league_strength_prior_weight: float = 5.0
     age_curve_min_rows: int = 100
     seed: int = 42

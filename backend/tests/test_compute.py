@@ -136,3 +136,23 @@ def test_team_totals_ignore_playoffs(db: Session, cfg: SportConfig) -> None:
     assert (after.loc[other, "team_matches"] == before.loc[other, "team_matches"]).all()
     assert (after["minutes"] / after["team_minutes"]).max() <= 1
     assert (after["appearances"] / after["team_matches"]).max() <= 1
+
+
+def test_all_zero_stat_is_missing(db: Session, cfg: SportConfig) -> None:
+    # Serie C reale: assist = 0 per tutti. Dato non rilevato, non uno 0 vero
+    sport_id = sync_config(db, cfg)
+    import_provider(db, MockProvider(cfg, "tiny", seed=7), sport_id)
+    st0 = db.scalars(select(m.PlayerSeasonStats).order_by(m.PlayerSeasonStats.id)).first()
+    assert st0 is not None
+    same = (m.PlayerSeasonStats.competition_id == st0.competition_id) & (
+        m.PlayerSeasonStats.season_id == st0.season_id
+    )
+    for st in db.scalars(select(m.PlayerSeasonStats).where(same)):
+        st.raw = st.raw | {"assists": 0}
+    db.flush()
+    rows = load_stats(db, sport_id, cfg)
+    target = (rows["competition_id"] == st0.competition_id) & (rows["season_id"] == st0.season_id)
+    assert target.sum() >= 30
+    assert not any("assists" in r for r in rows.loc[target, "raw"])
+    assert any("assists" in r for r in rows.loc[~target, "raw"])
+    assert all("goals" in r for r in rows.loc[target, "raw"])

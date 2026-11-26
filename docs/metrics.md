@@ -30,6 +30,14 @@ Per le metriche `ratio` (es. precisione passaggi) K è in tentativi:
 
 Sotto `min_minutes_sample` il giocatore resta visibile ma l'affidabilità è bassa.
 
+Un dato che vale 0 per tutti i giocatori di una competizione e stagione (almeno 30
+righe) è considerato non rilevato dal fornitore e trattato come mancante. Esempio: gli
+assist della Serie C su API-Football.
+
+**Minuti e partite della squadra** si contano sulla sola stagione regolare (partite con
+giornata). Se le statistiche dei giocatori includono i playoff, il totale della squadra
+sale fino a quanto giocato dai suoi giocatori, così quote minuti e presenze non superano 1.
+
 ## 2. Percentili e Livello nella lega
 
 - **Percentile** di una metrica: posizione della stima nel gruppo (0-100, ranghi medi per
@@ -56,9 +64,10 @@ portieri il motore usa:
 | Ammonizioni | statistiche base | disciplina |
 
 Ogni metrica ha un tipo di segnale (`signal` nel YAML). **Se il Livello di un giocatore
-non contiene nessuna metrica di prestazione, ad esempio un portiere di Serie C senza
-dettaglio delle partite, l'affidabilità è bassa** e `data_used` lo dichiara
-(`level_has_performance_metrics: false`). Per valutare davvero un portiere di serie
+contiene meno di `min_performance_metrics` metriche di prestazione (default 2),
+l'affidabilità è bassa.** Due casi tipici: un portiere di Serie C senza dettaglio delle
+partite (nessuna metrica di prestazione) e un giocatore di movimento di Serie C sul piano
+Free, che ha solo i gol. `data_used` elenca le metriche usate (`level_metrics`). Per valutare davvero un portiere di serie
 minore servono il dettaglio delle partite (gol subiti in campo) o un export CSV con i
 gol evitati.
 
