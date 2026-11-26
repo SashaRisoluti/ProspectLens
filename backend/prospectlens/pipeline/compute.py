@@ -100,18 +100,20 @@ def load_stats(session: Session, sport_id: int, cfg: SportConfig) -> pd.DataFram
         r | {"goals_conceded_on_pitch": float(c)} if pd.notna(c) else r
         for r, c in zip(df["raw"], df["conceded"], strict=True)
     ]
-    df["raw"] = _drop_all_zero(df)
+    df["raw"] = _drop_unrecorded(df)
     return df.drop(columns="conceded")
 
 
-def _drop_all_zero(df: pd.DataFrame) -> list[dict[str, Any]]:
-    """Un dato che vale 0 per tutti in una competizione e stagione non è rilevato dal
-    fornitore (es. assist in Serie C): si toglie, così risulta mancante e non uno 0 falso."""
+def _drop_unrecorded(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Un dato quasi sempre 0 in una competizione e stagione (diverso da 0 in meno dell'1%
+    delle righe) non è rilevato dal fornitore: in Serie C gli assist valgono 0 per tutti
+    tranne un caso isolato. Si toglie, così risulta mancante e non uno 0 falso. Il dato
+    vero più raro, le espulsioni, riguarda circa il 10% dei giocatori."""
     missing: dict[tuple[int, int], set[str]] = {}
     for key, raws in df.groupby(["competition_id", "season_id"])["raw"]:
         if len(raws) >= 30:  # con pochi giocatori uno 0 per tutti può essere vero
             keys = set().union(*raws)
-            missing[key] = {k for k in keys if all(not r.get(k) for r in raws)}
+            missing[key] = {k for k in keys if sum(bool(r.get(k)) for r in raws) < 0.01 * len(raws)}
     return [
         {k: v for k, v in r.items() if k not in missing.get((c, s), set())}
         for r, c, s in zip(df["raw"], df["competition_id"], df["season_id"], strict=True)

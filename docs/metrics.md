@@ -30,9 +30,9 @@ Per le metriche `ratio` (es. precisione passaggi) K è in tentativi:
 
 Sotto `min_minutes_sample` il giocatore resta visibile ma l'affidabilità è bassa.
 
-Un dato che vale 0 per tutti i giocatori di una competizione e stagione (almeno 30
-righe) è considerato non rilevato dal fornitore e trattato come mancante. Esempio: gli
-assist della Serie C su API-Football.
+Un dato diverso da 0 in meno dell'1% delle righe di una competizione e stagione (con
+almeno 30 righe) è considerato non rilevato dal fornitore e trattato come mancante.
+Esempio: gli assist della Serie C su API-Football, 0 per tutti tranne un caso isolato.
 
 **Minuti e partite della squadra** si contano sulla sola stagione regolare (partite con
 giornata). Se le statistiche dei giocatori includono i playoff, il totale della squadra
