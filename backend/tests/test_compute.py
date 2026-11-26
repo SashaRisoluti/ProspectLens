@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from prospectlens.config import SportConfig
 from prospectlens.db import models as m
-from prospectlens.pipeline.compute import compute
+from prospectlens.pipeline.compute import compute, load_stats
 from prospectlens.pipeline.importer import import_provider
 from prospectlens.pipeline.sync_config import sync_config
 from prospectlens.providers.mock import MockProvider
@@ -103,3 +103,36 @@ def test_compute_with_missing_birth_dates(db: Session, cfg: SportConfig) -> None
         assert s.score is not None
         if s.goal_code in ("growth", "longevity"):
             assert s.player_id not in no_age
+
+
+def test_team_totals_ignore_playoffs(db: Session, cfg: SportConfig) -> None:
+    # Dati reali: partite di playoff senza giornata (Serie B) e statistiche giocatore che
+    # includono i playoff (Serie C). Le quote minuti e presenze restano al massimo 1.
+    sport_id = sync_config(db, cfg)
+    import_provider(db, MockProvider(cfg, "tiny", seed=7), sport_id)
+    before = load_stats(db, sport_id, cfg).set_index("stat_id")
+    match = db.scalars(select(m.Match).order_by(m.Match.id)).first()
+    assert match is not None
+    db.add(
+        m.Match(
+            competition_id=match.competition_id,
+            season_id=match.season_id,
+            source=match.source,
+            ext_id="playoff-1",
+            matchday=None,
+            home_team_id=match.home_team_id,
+            away_team_id=match.away_team_id,
+            source_id=match.source_id,
+        )
+    )
+    for st in db.scalars(
+        select(m.PlayerSeasonStats).where(m.PlayerSeasonStats.team_id == match.home_team_id)
+    ):
+        st.minutes = int(st.minutes * 1.3)
+        st.appearances += 4
+    db.flush()
+    after = load_stats(db, sport_id, cfg).set_index("stat_id")
+    other = after.index[after["team_id"] != match.home_team_id]
+    assert (after.loc[other, "team_matches"] == before.loc[other, "team_matches"]).all()
+    assert (after["minutes"] / after["team_minutes"]).max() <= 1
+    assert (after["appearances"] / after["team_matches"]).max() <= 1

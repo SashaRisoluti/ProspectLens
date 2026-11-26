@@ -10,6 +10,7 @@ sport:
 normalization:
   unit: minutes
   per: 90
+  players_on_field: 11
 
 age:
   max_search_age: 25          # tetto del filtro età nella ricerca

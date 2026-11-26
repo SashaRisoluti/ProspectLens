@@ -32,6 +32,7 @@ class Roles(_Strict):
 class Normalization(_Strict):
     unit: str
     per: float
+    players_on_field: int  # titolari in campo per squadra (11 nel calcio)
 
 
 class AgeConfig(_Strict):

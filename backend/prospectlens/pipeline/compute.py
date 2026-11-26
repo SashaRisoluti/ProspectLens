@@ -71,17 +71,26 @@ def load_stats(session: Session, sport_id: int, cfg: SportConfig) -> pd.DataFram
     birth = pd.to_datetime(df["birth_date"])
     df["age"] = (pd.to_datetime(df["season_start"]) - birth).dt.days / 365.25
     df["birth_year"] = birth.dt.year
+    # solo stagione regolare (con giornata): in Serie B le statistiche escludono playoff e playout
     team_games = _read(
         session,
         """
         SELECT team_id, competition_id, season_id, count(*) AS n FROM (
           SELECT home_team_id AS team_id, competition_id, season_id FROM match
-          UNION ALL SELECT away_team_id, competition_id, season_id FROM match) t
+           WHERE matchday IS NOT NULL
+          UNION ALL SELECT away_team_id, competition_id, season_id FROM match
+           WHERE matchday IS NOT NULL) t
         GROUP BY 1, 2, 3""",
     )
     df = df.merge(team_games, on=["team_id", "competition_id", "season_id"], how="left")
-    df["team_matches"] = df["n"]
-    df["team_minutes"] = df["n"] * cfg.normalization.per
+    # in Serie C invece le statistiche includono i playoff: il totale della squadra non è mai
+    # sotto quanto giocato dai suoi giocatori
+    team = df.groupby(["team_id", "competition_id", "season_id"])
+    norm = cfg.normalization
+    df["team_minutes"] = np.fmax(
+        df["n"] * norm.per, team["minutes"].transform("sum") / norm.players_on_field
+    )
+    df["team_matches"] = np.fmax(df["n"], team["appearances"].transform("max"))
     # gol subiti dalla squadra mentre il giocatore era in campo (da formazioni ed eventi)
     conceded = _read(session, CONCEDED_SQL)
     df = df.drop(columns="n").merge(
